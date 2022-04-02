@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const { Blog } = require('../models');
+const { Blog, Session } = require('../models');
 const { SECRET } = require('./config');
 
 const tokenExtractor = (req, res, next) => {
@@ -8,12 +8,25 @@ const tokenExtractor = (req, res, next) => {
   if (authorization && authorization.toLowerCase().startsWith('bearer ')) {
     try {
       req.decodedToken = jwt.verify(authorization.substring(7), SECRET);
+      req.token = authorization.substring(7);
     } catch {
       res.status(401).json({ error: 'invalid token' });
     }
   } else {
     res.status(401).json({ error: 'token missing' });
   }
+  next();
+};
+
+const sessionChecker = async (req, res, next) => {
+  req.session = await Session.findOne({
+    token: req.token,
+  });
+
+  if (!req.session) {
+    res.status(401).json({ error: 'session expired' });
+  }
+
   next();
 };
 
@@ -46,6 +59,7 @@ const errorHandler = (error, req, res, next) => {
 
 module.exports = {
   tokenExtractor,
+  sessionChecker,
   blogFinder,
   unknownEndpoint,
   errorHandler,
